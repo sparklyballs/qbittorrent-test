@@ -71,7 +71,7 @@ RUN \
 		--prefix=/usr \
 		--sysconfdir=/etc \
 		
-	&& make -j8 \
+	&& make \
 	&& make DESTDIR=/rasterbar-build-output install
 
 FROM alpine:${ALPINE_VER} as qbittorrent-build-stage
@@ -107,7 +107,7 @@ RUN \
 	&& ./configure \
 		--disable-gui \
 		--prefix=/usr \
-	&& make -j8 \
+	&& make \
 	&& make INSTALL_ROOT=/build-output install
 
 FROM sparklyballs/alpine-test:${ALPINE_VER} as strip-stage
