@@ -56,9 +56,12 @@ RUN \
 		libtorrent-rasterbar-dev
 
 
+# set workdir
+WORKDIR /tmp/qbittorrent-src
+
 # build app
 RUN \
-	cd /tmp/qbittorrent-src \
+	set -ex \
 	&& ./configure \
 		--disable-gui \
 		--prefix=/usr \
