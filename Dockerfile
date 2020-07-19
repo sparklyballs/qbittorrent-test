@@ -52,7 +52,6 @@ RUN \
 	set -ex \
 	&& apk add --no-cache \
 		boost-dev \
-		cmake \
 		g++ \
 		gcc \
 		git \
@@ -89,14 +88,12 @@ RUN \
 	set -ex \
 	&& apk add --no-cache \
 		boost-dev \
-		cmake \
 		g++ \
 		gcc \
 		git \
-		openssl-dev \
 		make \
+		openssl-dev \
 		qt5-qttools-dev
-
 
 # set workdir
 WORKDIR /tmp/qbittorrent-src
