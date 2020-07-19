@@ -91,7 +91,7 @@ RUN \
 	apk add --no-cache \
 		p7zip \
 		qt5-qtbase \
-		unzip
+		unzip \
 	&& apk add --no-cache \
 	-X http://dl-cdn.alpinelinux.org/alpine/edge/testing \
 		libtorrent-rasterbar
