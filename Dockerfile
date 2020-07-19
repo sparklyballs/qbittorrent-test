@@ -70,6 +70,14 @@ RUN \
 
 FROM sparklyballs/alpine-test:${ALPINE_VER}
 
+############## runtine stage ##############
+
+# add unrar
+# sourced from self builds here:- 
+# https://ci.sparklyballs.com:9443/job/App-Builds/job/unrar-build/
+# builds will fail unless you download a copy of the build artifacts and place in a folder called build
+ADD /build/unrar-*.tar.gz /usr/bin/
+
 # environment settings
 ENV HOME="/config" \
 XDG_CONFIG_HOME="/config" \
@@ -81,7 +89,9 @@ COPY --from=build-stage /build/usr /usr
 # install runtime packages
 RUN \
 	apk add --no-cache \
+		p7zip \
 		qt5-qtbase \
+		unzip
 	&& apk add --no-cache \
 	-X http://dl-cdn.alpinelinux.org/alpine/edge/testing \
 		libtorrent-rasterbar
