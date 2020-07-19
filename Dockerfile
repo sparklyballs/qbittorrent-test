@@ -111,11 +111,11 @@ FROM sparklyballs/alpine-test:${ALPINE_VER} as strip-stage
 ############## strip stage ##############
 
 # add artifacts from build stages
-COPY --from=qbittorrent-build-stage /build-output/usr /strip-output/usr
-COPY --from=rasterbar-build-stage /rasterbar-build-output/usr /strip-output/usr
+COPY --from=qbittorrent-build-stage /build-output/usr /build-all/usr
+COPY --from=rasterbar-build-stage /rasterbar-build-output/usr /build-all/usr
 
 # set workdir
-WORKDIR /strip-output/usr
+WORKDIR /build-all/usr
 
 # install strip packages
 RUN \
@@ -130,7 +130,12 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # strip packages
 RUN \
 	set -ex \
-	&& find . -type f | xargs strip --strip-all || true
+	&& for dirs in /usr/lib /usr/bin /usr/include /usr/share; \
+	do \
+		find /build-all/"${dirs}" -type f | \
+		while read -r files ; do strip "${files}" || true \
+		; done \
+	; done
 
 FROM sparklyballs/alpine-test:${ALPINE_VER}
 
@@ -148,7 +153,7 @@ XDG_CONFIG_HOME="/config" \
 XDG_DATA_HOME="/config"
 
 # add artifacts from strip stage
-COPY --from=strip-stage /strip-output/usr /usr
+COPY --from=strip-stage /build-all/usr /usr
 
 # install runtime packages
 RUN \
