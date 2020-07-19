@@ -66,7 +66,7 @@ RUN \
 		--disable-gui \
 		--prefix=/usr \
 	&& make \
-	&& make INSTALL_ROOT=/build install
+	&& make INSTALL_ROOT=/build-output install
 
 FROM sparklyballs/alpine-test:${ALPINE_VER}
 
@@ -84,7 +84,7 @@ XDG_CONFIG_HOME="/config" \
 XDG_DATA_HOME="/config"
 
 # add artifacts from build stage
-COPY --from=build-stage /build/usr /usr
+COPY --from=build-stage /build-output/usr /usr
 
 # install runtime packages
 RUN \
