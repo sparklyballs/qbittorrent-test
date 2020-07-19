@@ -125,6 +125,9 @@ RUN \
 		bash \
 		binutils
 
+# set shell
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # strip packages
 RUN \
 	set -ex \
