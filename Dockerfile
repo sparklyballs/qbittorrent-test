@@ -29,13 +29,13 @@ RUN \
 		/tmp/qbittorrent-src \
 	&& curl -o \
 	/tmp/rasterbar.tar.gz	-L \
-		"https://github.com/arvidn/libtorrent/releases/download/${LIBTORRENT_RELEASE//./_}/libtorrent-rasterbar-${LIBTORRENT_RELEASE#libtorrent.}.tar.gz" \
+		"https://github.com/arvidn/libtorrent/releases/download/libtorrent_${LIBTORRENT_RELEASE//./_}/libtorrent-rasterbar-${LIBTORRENT_RELEASE}.tar.gz" \
 	&& tar xf \
 	/tmp/rasterbar.tar.gz -C \
 	/tmp/rasterbar-src --strip-components=1 \
 	&& curl -o \
 	/tmp/qbittorrent.tar.gz	-L \
-		"https://github.com/qbittorrent/qBittorrent/archive/release-4.2.5.tar.gz" \
+		"https://github.com/qbittorrent/qBittorrent/archive/release-${QBITTORRENT_TAG}.tar.gz" \
 	&& tar xf \
 	/tmp/qbittorrent.tar.gz -C \
 	/tmp/qbittorrent-src --strip-components=1
@@ -69,8 +69,7 @@ RUN \
 		--localstatedir=/var \
 		--prefix=/usr \
 		--sysconfdir=/etc \
-		
-	&& make \
+	&& make -j4 \
 	&& make DESTDIR=/rasterbar-build-output install
 
 FROM alpine:${ALPINE_VER} as qbittorrent-build-stage
@@ -104,7 +103,7 @@ RUN \
 	&& ./configure \
 		--disable-gui \
 		--prefix=/usr \
-	&& make \
+	&& make -j4 \
 	&& make INSTALL_ROOT=/build-output install
 
 FROM sparklyballs/alpine-test:${ALPINE_VER} as strip-stage
