@@ -62,7 +62,7 @@ RUN \
 	&& ./configure \
 		--disable-gui \
 		--prefix=/usr \
-	&& make -j8 \
+	&& make \
 	&& make INSTALL_ROOT=/build install
 
 FROM sparklyballs/alpine-test:${ALPINE_VER}
