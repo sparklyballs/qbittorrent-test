@@ -25,32 +25,28 @@ RUN \
 	. /tmp/version.txt \
 	&& set -ex \
 	&& mkdir -p \
-		/tmp/rasterbar-src \
-		/tmp/qbittorrent-src \
+		/source/rasterbar \
+		/source/qbittorrent \
 	&& curl -o \
 	/tmp/rasterbar.tar.gz	-L \
 		"https://github.com/arvidn/libtorrent/releases/download/libtorrent_${LIBTORRENT_RELEASE//./_}/libtorrent-rasterbar-${LIBTORRENT_RELEASE}.tar.gz" \
 	&& tar xf \
 	/tmp/rasterbar.tar.gz -C \
-	/tmp/rasterbar-src --strip-components=1 \
+	/source/rasterbar --strip-components=1 \
 	&& curl -o \
 	/tmp/qbittorrent.tar.gz	-L \
 		"https://github.com/qbittorrent/qBittorrent/archive/release-${QBITTORRENT_TAG}.tar.gz" \
 	&& tar xf \
 	/tmp/qbittorrent.tar.gz -C \
-	/tmp/qbittorrent-src --strip-components=1
+	/source/qbittorrent --strip-components=1
 
-FROM alpine:${ALPINE_VER} as rasterbar-build-stage
+FROM alpine:${ALPINE_VER} as packages-stage
 
-############## rasterbar build stage ##############
-
-# add  artifacts from fetch stage
-COPY --from=fetch-stage /tmp/rasterbar-src /tmp/rasterbar-src
+############## packages stage ##############
 
 # install build packages
 RUN \
-	set -ex \
-	&& apk add --no-cache \
+	apk add --no-cache \
 		boost-dev \
 		g++ \
 		gcc \
@@ -59,8 +55,16 @@ RUN \
 		make \
 		qt5-qttools-dev
 
+
+FROM packages-stage as rasterbar-build-stage
+
+############## rasterbar build stage ##############
+
+# add artifacts from source stage
+COPY --from=fetch-stage /source /source
+
 # set workdir
-WORKDIR /tmp/rasterbar-src
+WORKDIR /source/rasterbar
 
 # build rasterbar
 RUN \
@@ -70,32 +74,20 @@ RUN \
 		--prefix=/usr \
 		--sysconfdir=/etc \
 	&& make -j4 \
-	&& make DESTDIR=/rasterbar-build-output install
+	&& make DESTDIR=/output/rasterbar install
 
-FROM alpine:${ALPINE_VER} as qbittorrent-build-stage
+FROM packages-stage as qbittorrent-build-stage
 
 ############## qbittorrent build stage ##############
 
-# add  artifacts from fetch stage
-COPY --from=fetch-stage /tmp/qbittorrent-src /tmp/qbittorrent-src
+# add artifacts from source stage
+COPY --from=fetch-stage /source /source
 
 # add artifacts from rasterbar build stage
-COPY --from=rasterbar-build-stage /rasterbar-build-output/usr /usr
-
-# install build packages
-RUN \
-	set -ex \
-	&& apk add --no-cache \
-		boost-dev \
-		g++ \
-		gcc \
-		git \
-		make \
-		openssl-dev \
-		qt5-qttools-dev
+COPY --from=rasterbar-build-stage /output/rasterbar/usr /usr
 
 # set workdir
-WORKDIR /tmp/qbittorrent-src
+WORKDIR /source/qbittorrent
 
 # build app
 RUN \
@@ -104,18 +96,18 @@ RUN \
 		--disable-gui \
 		--prefix=/usr \
 	&& make -j4 \
-	&& make INSTALL_ROOT=/build-output install
+	&& make INSTALL_ROOT=/output/qbittorrent install
 
-FROM sparklyballs/alpine-test:${ALPINE_VER} as strip-stage
+FROM alpine:${ALPINE_VER} as strip-stage
 
 ############## strip stage ##############
 
 # add artifacts from build stages
-COPY --from=qbittorrent-build-stage /build-output/usr /build-all/usr
-COPY --from=rasterbar-build-stage /rasterbar-build-output/usr /build-all/usr
+COPY --from=qbittorrent-build-stage /output/qbittorrent/usr /builds/usr
+COPY --from=rasterbar-build-stage /output/rasterbar/usr /builds/usr
 
 # set workdir
-WORKDIR /build-all/usr
+WORKDIR /builds/usr
 
 # install strip packages
 RUN \
@@ -132,7 +124,7 @@ RUN \
 	set -ex \
 	&& for dirs in /usr/lib /usr/bin /usr/include /usr/share; \
 	do \
-		find /build-all/"${dirs}" -type f | \
+		find /builds/"${dirs}" -type f | \
 		while read -r files ; do strip "${files}" || true \
 		; done \
 	; done
@@ -153,7 +145,7 @@ XDG_CONFIG_HOME="/config" \
 XDG_DATA_HOME="/config"
 
 # add artifacts from strip stage
-COPY --from=strip-stage /build-all/usr /usr
+COPY --from=strip-stage /builds/usr /usr
 
 # install runtime packages
 RUN \
