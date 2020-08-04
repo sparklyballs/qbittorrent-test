@@ -29,7 +29,7 @@ RUN \
 		/source/qbittorrent \
 	&& curl -o \
 	/tmp/rasterbar.tar.gz	-L \
-		"https://github.com/arvidn/libtorrent/releases/download/libtorrent_${LIBTORRENT_RELEASE//./_}/libtorrent-rasterbar-${LIBTORRENT_RELEASE}.tar.gz" \
+		"https://github.com/arvidn/libtorrent/releases/download/libtorrent-${LIBTORRENT_RELEASE}/libtorrent-rasterbar-${LIBTORRENT_RELEASE}.tar.gz" \
 	&& tar xf \
 	/tmp/rasterbar.tar.gz -C \
 	/source/rasterbar --strip-components=1 \
