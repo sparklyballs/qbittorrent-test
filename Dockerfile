@@ -29,7 +29,7 @@ RUN \
 		/source/qbittorrent \
 	&& curl -o \
 	/tmp/rasterbar.tar.gz	-L \
-		"https://github.com/arvidn/libtorrent/releases/download/libtorrent-${LIBTORRENT_RELEASE}/libtorrent-rasterbar-${LIBTORRENT_RELEASE}.tar.gz" \
+		"https://github.com/arvidn/libtorrent/releases/download/v${LIBTORRENT_RELEASE}/libtorrent-rasterbar-${LIBTORRENT_RELEASE}.tar.gz" \
 	&& tar xf \
 	/tmp/rasterbar.tar.gz -C \
 	/source/rasterbar --strip-components=1 \
@@ -48,11 +48,13 @@ FROM alpine:${ALPINE_VER} as packages-stage
 RUN \
 	apk add --no-cache \
 		boost-dev \
+		cmake \
 		g++ \
 		gcc \
 		git \
 		openssl-dev \
 		make \
+		ninja \
 		qt5-qttools-dev
 
 
@@ -63,18 +65,25 @@ FROM packages-stage as rasterbar-build-stage
 # add artifacts from source stage
 COPY --from=fetch-stage /source /source
 
+# create build directory for cmake
+RUN \
+	mkdir -p \
+		/source/rasterbar/build
+
 # set workdir
-WORKDIR /source/rasterbar
+WORKDIR /source/rasterbar/build
 
 # build rasterbar
 RUN \
 	set -ex \
-	&& ./configure \
-		--localstatedir=/var \
-		--prefix=/usr \
-		--sysconfdir=/etc \
-	&& make -j4 \
-	&& make DESTDIR=/output/rasterbar install
+	&& cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_CXX_STANDARD=14 \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \	
+		-G Ninja .. \
+	&& ninja -j4 \
+	&& DESTDIR=/output/rasterbar ninja install
 
 FROM packages-stage as qbittorrent-build-stage
 
