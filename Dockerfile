@@ -95,17 +95,29 @@ COPY --from=fetch-stage /source /source
 # add artifacts from rasterbar build stage
 COPY --from=rasterbar-build-stage /output/rasterbar/usr /usr
 
+# create build directory for cmake
+RUN \
+	mkdir -p \
+		/source/qbittorrent/build
+
 # set workdir
-WORKDIR /source/qbittorrent
+WORKDIR /source/qbittorrent/build
 
 # build app
 RUN \
 	set -ex \
-	&& ./configure \
-		--disable-gui \
-		--prefix=/usr \
-	&& make -j4 \
-	&& make INSTALL_ROOT=/output/qbittorrent install
+	&& cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_CXX_STANDARD=14 \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DDBUS=OFF \
+		-DGUI=OFF \
+		-DQBT_VER_STATUS="" \
+		-DSTACKTRACE=OFF \
+		-G Ninja .. \
+	&& ninja -j4 \
+	&& DESTDIR=/output/qbittorrent ninja install
 
 FROM alpine:${ALPINE_VER} as strip-stage
 
@@ -171,3 +183,4 @@ COPY root/ /
 # ports and volumes
 EXPOSE 8080
 VOLUME /config /downloads
+
