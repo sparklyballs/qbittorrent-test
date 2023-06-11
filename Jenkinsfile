@@ -25,7 +25,7 @@ stage('Query Release Version') {
 steps {
 script{
 	env.RELEASE_VER = sh(script: 'curl -u "${SECRETUSER}:${SECRETPASS}" -sX GET "https://api.github.com/repos/${GITHUB_RELEASE_URL_SUFFIX}"  \
-	| jq -r ".[0].name"', returnStdout: true).trim()
+	| jq -r ".[].name" | grep -v -e 'alpha' -e 'beta' -e 'rc' | head -n 1', returnStdout: true).trim()
 	env.LIBTORRENT_RELEASE_VER = sh(script: 'curl -u "${SECRETUSER}:${SECRETPASS}" -sX GET "https://api.github.com/repos/${LIBTORRENT_RELEASE_URL_SUFFIX}" \
 	| jq -r ".tag_name" | sed "s/v//"', returnStdout: true).trim() 
 	}

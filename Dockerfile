@@ -10,6 +10,7 @@ RUN \
 	apk add --no-cache \
 		bash \
 		curl \
+		grep \
 		jq
 
 # set shell
@@ -30,8 +31,10 @@ RUN \
 	/tmp/rasterbar.tar.gz -C \
 	/src/rasterbar --strip-components=1 \
 	&& if [ -z ${RELEASE+x} ]; then \
-	RELEASE=$(curl -u "${SECRETUSER}:${SECRETPASS}" -sX GET "https://api.github.com/repos/qbittorrent/qBittorrent/tags"  \
-	| jq -r ".[0].name"); \
+	RELEASE=$(curl -u "${SECRETUSER}:${SECRETPASS}" -sX GET "https://api.github.com/repos/qbittorrent/qBittorrent/tags" \
+	| jq -r ".[].name" \
+	| grep -v -e 'alpha' -e 'beta' -e 'rc' \
+	| head -n 1); \
 	fi \
 	&& mkdir -p \
 		/src/qbittorrent \
