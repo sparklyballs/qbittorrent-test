@@ -1,77 +1,77 @@
-ARG ALPINE_VER="3.13"
+ARG ALPINE_VER="3.18"
 FROM alpine:${ALPINE_VER} as fetch-stage
 
-############## fetch stage ##############
+# build args
+ARG RELEASE
+ARG LIBTORRENT_RELEASE
 
 # install fetch packages
 RUN \
 	apk add --no-cache \
 		bash \
-		curl
+		curl \
+		jq
 
 # set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# fetch version file
+# fetch source
 RUN \
-	set -ex \
-	&& curl -o \
-	/tmp/version.txt -L \
-	"https://raw.githubusercontent.com/sparklyballs/versioning/master/version.txt"
-
-# fetch source code
-# hadolint ignore=SC1091
-RUN \
-	. /tmp/version.txt \
-	&& set -ex \
+	if [ -z ${LIBTORRENT_RELEASE+x} ]; then \
+	LIBTORRENT_RELEASE=$(curl -u "${SECRETUSER}:${SECRETPASS}" -sX GET "https://api.github.com/repos/arvidn/libtorrent/releases/latest" \
+	| jq -r ".tag_name" | sed "s/v//"); \
+	fi \
 	&& mkdir -p \
-		/source/rasterbar \
-		/source/qbittorrent \
+		/src/rasterbar \
 	&& curl -o \
-	/tmp/rasterbar.tar.gz	-L \
-		"https://github.com/arvidn/libtorrent/releases/download/v${LIBTORRENT_RELEASE}/libtorrent-rasterbar-${LIBTORRENT_RELEASE}.tar.gz" \
+	/tmp/rasterbar.tar.gz -L \
+	"https://github.com/arvidn/libtorrent/releases/download/v${LIBTORRENT_RELEASE}/libtorrent-rasterbar-${LIBTORRENT_RELEASE}.tar.gz" \
 	&& tar xf \
 	/tmp/rasterbar.tar.gz -C \
-	/source/rasterbar --strip-components=1 \
+	/src/rasterbar --strip-components=1 \
+	&& if [ -z ${RELEASE+x} ]; then \
+	RELEASE=$(curl -u "${SECRETUSER}:${SECRETPASS}" -sX GET "https://api.github.com/repos/qbittorrent/qBittorrent/tags"  \
+	| jq -r ".[0].name"); \
+	fi \
+	&& mkdir -p \
+		/src/qbittorrent \
 	&& curl -o \
 	/tmp/qbittorrent.tar.gz	-L \
-		"https://github.com/qbittorrent/qBittorrent/archive/release-${QBITTORRENT_TAG}.tar.gz" \
+		"https://github.com/qbittorrent/qBittorrent/archive/refs/tags/${RELEASE}.tar.gz" \
 	&& tar xf \
 	/tmp/qbittorrent.tar.gz -C \
-	/source/qbittorrent --strip-components=1
+	/src/qbittorrent --strip-components=1
+
 
 FROM alpine:${ALPINE_VER} as packages-stage
-
-############## packages stage ##############
 
 # install build packages
 RUN \
 	apk add --no-cache \
-		boost-dev \
-		cmake \
-		g++ \
-		gcc \
-		git \
-		openssl-dev \
-		make \
-		ninja \
-		qt5-qttools-dev
-
+	boost-dev \
+	cmake \
+	gcc \
+	g++ \
+	openssl-dev \
+	qt6-qtbase-dev \
+	qt6-qtsvg-dev \
+	qt6-qttools-dev \
+	samurai
 
 FROM packages-stage as rasterbar-build-stage
 
 ############## rasterbar build stage ##############
 
 # add artifacts from source stage
-COPY --from=fetch-stage /source /source
+COPY --from=fetch-stage /src /src
 
 # create build directory for cmake
 RUN \
 	mkdir -p \
-		/source/rasterbar/build
+		/src/rasterbar/build
 
 # set workdir
-WORKDIR /source/rasterbar/build
+WORKDIR /src/rasterbar/build
 
 # build rasterbar
 RUN \
@@ -87,41 +87,29 @@ RUN \
 
 FROM packages-stage as qbittorrent-build-stage
 
-############## qbittorrent build stage ##############
-
 # add artifacts from source stage
-COPY --from=fetch-stage /source /source
+COPY --from=fetch-stage /src /src
 
 # add artifacts from rasterbar build stage
 COPY --from=rasterbar-build-stage /output/rasterbar/usr /usr
 
-# create build directory for cmake
-RUN \
-	mkdir -p \
-		/source/qbittorrent/build
-
 # set workdir
-WORKDIR /source/qbittorrent/build
+WORKDIR /src/qbittorrent
 
 # build app
 RUN \
 	set -ex \
-	&& cmake \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_CXX_STANDARD=14 \
+	&& cmake -B build-nox -G Ninja \
+		-DCMAKE_BUILD_TYPE=None \
 		-DCMAKE_INSTALL_PREFIX=/usr \
-		-DCMAKE_INSTALL_LIBDIR=lib \
-		-DDBUS=OFF \
 		-DGUI=OFF \
-		-DQBT_VER_STATUS="" \
 		-DSTACKTRACE=OFF \
-		-G Ninja .. \
-	&& ninja -j4 \
-	&& DESTDIR=/output/qbittorrent ninja install
+		-DQT6=ON \
+	&& cmake --build build-nox \
+	&& install -Dm755 build-nox/qbittorrent-nox \
+		-t /output/qbittorrent/usr/bin
 
 FROM alpine:${ALPINE_VER} as strip-stage
-
-############## strip stage ##############
 
 # add artifacts from build stages
 COPY --from=qbittorrent-build-stage /output/qbittorrent/usr /builds/usr
@@ -152,13 +140,11 @@ RUN \
 
 FROM sparklyballs/alpine-test:${ALPINE_VER}
 
-############## runtine stage ##############
-
 # add unrar
-# sourced from self builds here:- 
-# https://ci.sparklyballs.com:9443/job/App-Builds/job/unrar-build/
 # builds will fail unless you download a copy of the build artifacts and place in a folder called build
-ADD /build/unrar-*.tar.gz /usr/bin/
+# sourced from the relevant builds here https://ci.sparklyballs.com/job/App-Builds/
+
+COPY /build/unrar-*.tar.gz /usr/bin/
 
 # environment settings
 ENV HOME="/config" \
@@ -174,7 +160,7 @@ RUN \
 		boost-system \
 		boost-thread \
 		p7zip \
-		qt5-qtbase \
+		qt6-qtbase \
 		unzip
 
 # add local files
