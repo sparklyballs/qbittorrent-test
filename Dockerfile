@@ -1,5 +1,10 @@
 ARG ALPINE_VER="3.18"
-FROM alpine:${ALPINE_VER} as fetch-stage
+FROM alpine:${ALPINE_VER} as base
+
+# cmake options
+ENV CFLAGS="-pipe -fstack-clash-protection -fstack-protector-strong -fno-plt -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS"
+ENV CXXFLAGS="-pipe -fstack-clash-protection -fstack-protector-strong -fno-plt -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS"
+ENV LDFLAGS="-gz -Wl,-O1,--as-needed,--sort-common,-z,now,-z,relro"
 
 # build args
 ARG RELEASE
@@ -46,102 +51,55 @@ RUN \
 	/src/qbittorrent --strip-components=1
 
 
-FROM alpine:${ALPINE_VER} as packages-stage
+FROM base as build_stage
 
 # install build packages
 RUN \
 	apk add --no-cache \
-	boost-dev \
-	cmake \
-	gcc \
-	g++ \
-	openssl-dev \
-	qt6-qtbase-dev \
-	qt6-qtsvg-dev \
-	qt6-qttools-dev \
-	samurai
+		boost-dev \
+		cmake \
+		git \
+		g++ \
+		ninja \
+		openssl-dev \
+		qt6-qtbase-dev \
+		qt6-qttools-dev
 
-FROM packages-stage as rasterbar-build-stage
-
-############## rasterbar build stage ##############
-
-# add artifacts from source stage
-COPY --from=fetch-stage /src /src
-
-# create build directory for cmake
-RUN \
-	mkdir -p \
-		/src/rasterbar/build
-
-# set workdir
-WORKDIR /src/rasterbar/build
+WORKDIR /src/rasterbar
 
 # build rasterbar
 RUN \
-	set -ex \
-	&& cmake \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_CXX_STANDARD=14 \
+	cmake \
+		-B build \
+		-G Ninja \
+		-DBUILD_SHARED_LIBS=OFF \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DCMAKE_INSTALL_PREFIX=/usr \
-		-DCMAKE_INSTALL_LIBDIR=lib \	
-		-G Ninja .. \
-	&& ninja -j4 \
-	&& DESTDIR=/output/rasterbar ninja install
+		-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+		-Ddeprecated-functions=OFF \
+		&& cmake --build build -j "$(nproc)" \
+		&& cmake --install build
 
-FROM packages-stage as qbittorrent-build-stage
-
-# add artifacts from source stage
-COPY --from=fetch-stage /src /src
-
-# add artifacts from rasterbar build stage
-COPY --from=rasterbar-build-stage /output/rasterbar/usr /usr
-
-# set workdir
 WORKDIR /src/qbittorrent
 
-# build app
+# build qbitorrent
 RUN \
-	set -ex \
-	&& cmake -B build-nox -G Ninja \
-		-DCMAKE_BUILD_TYPE=None \
+	cmake \
+		-B build \
+		-G Ninja \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
 		-DGUI=OFF \
-		-DSTACKTRACE=OFF \
 		-DQT6=ON \
-	&& cmake --build build-nox \
-	&& install -Dm755 build-nox/qbittorrent-nox \
-		-t /output/qbittorrent/usr/bin
-
-FROM alpine:${ALPINE_VER} as strip-stage
-
-# add artifacts from build stages
-COPY --from=qbittorrent-build-stage /output/qbittorrent/usr /builds/usr
-COPY --from=rasterbar-build-stage /output/rasterbar/usr /builds/usr
-
-# set workdir
-WORKDIR /builds/usr
-
-# install strip packages
-RUN \
-	set -ex \
-	&& apk add --no-cache \
-		bash \
-		binutils
-
-# set shell
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
-# strip packages
-RUN \
-	set -ex \
-	&& for dirs in /usr/lib /usr/bin /usr/include /usr/share; \
-	do \
-		find /builds/"${dirs}" -type f | \
-		while read -r files ; do strip "${files}" || true \
-		; done \
-	; done
+	&& cmake --build build -j "$(nproc)" \
+	&& cmake --install build \
+	&& strip /usr/bin/qbittorrent-nox
 
 FROM sparklyballs/alpine-test:${ALPINE_VER}
+
+# copy build artifacts
+COPY --from=build_stage /usr/bin/qbittorrent-nox /usr/bin/qbittorrent-nox
 
 # add unrar
 # builds will fail unless you download a copy of the build artifacts and place in a folder called build
@@ -154,17 +112,15 @@ ENV HOME="/config" \
 XDG_CONFIG_HOME="/config" \
 XDG_DATA_HOME="/config"
 
-# add artifacts from strip stage
-COPY --from=strip-stage /builds/usr /usr
-
 # install runtime packages
 RUN \
-	apk add --no-cache \
-		boost-system \
-		boost-thread \
-		p7zip \
-		qt6-qtbase \
-		unzip
+	apk --no-cache add \
+	bash \
+	curl \
+	python3 \
+	qt6-qtbase \
+	qt6-qtbase-sqlite \
+	tzdata
 
 # add local files
 COPY root/ /
