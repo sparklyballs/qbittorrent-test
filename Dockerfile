@@ -105,7 +105,7 @@ COPY --from=build_stage /usr/bin/qbittorrent-nox /usr/bin/qbittorrent-nox
 # builds will fail unless you download a copy of the build artifacts and place in a folder called build
 # sourced from the relevant builds here https://ci.sparklyballs.com/job/App-Builds/
 
-COPY /build/unrar-*.tar.gz /usr/bin/
+ADD /build/unrar-*.tar.gz /usr/bin/
 
 # environment settings
 ENV HOME="/config" \
