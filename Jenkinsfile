@@ -16,7 +16,6 @@ environment {
 	GITHUB_RELEASE_URL_SUFFIX = 'qbittorrent/qBittorrent/tags'
 	LIBTORRENT_RELEASE_URL_SUFFIX = 'arvidn/libtorrent/releases/latest'
 	GITHUB_REPOSITORY = 'sparklyballs/qbittorrent-test'
-	HADOLINT_OPTIONS = '--ignore DL3008 --ignore DL3013 --ignore DL3018 --ignore DL3028 --format json'
 	}
 
 stages {
@@ -26,8 +25,9 @@ steps {
 script{
 	env.RELEASE_VER = sh(script: 'curl -u "${SECRETUSER}:${SECRETPASS}" -sX GET "https://api.github.com/repos/${GITHUB_RELEASE_URL_SUFFIX}"  \
 	| jq -r ".[].name" | grep -v -e "alpha" -e "beta" -e "rc" | head -n 1', returnStdout: true).trim()
-	env.LIBTORRENT_RELEASE_VER = sh(script: 'curl -u "${SECRETUSER}:${SECRETPASS}" -sX GET "https://api.github.com/repos/${LIBTORRENT_RELEASE_URL_SUFFIX}" \
+	env.LIBTORRENT_VER = sh(script: 'curl -u "${SECRETUSER}:${SECRETPASS}" -sX GET "https://api.github.com/repos/${LIBTORRENT_RELEASE_URL_SUFFIX}" \
 	| jq -r ".tag_name" | sed "s/v//"', returnStdout: true).trim() 
+	env.RELEASE_TAG = "${RELEASE_VER#release-}"
 	}
 	}
 	}
@@ -61,8 +61,8 @@ steps {
 	--pull \
 	-t $CONTAINER_REPOSITORY:latest \
 	-t $CONTAINER_REPOSITORY:$BUILD_NUMBER \
-	-t $CONTAINER_REPOSITORY:${RELEASE_VER}_${LIBTORRENT_RELEASE_VER} \
-	--build-arg LIBTORRENT_RELEASE=$LIBTORRENT_RELEASE_VER \
+	-t $CONTAINER_REPOSITORY:${RELEASE_TAG}_${LIBTORRENT_VER} \
+	--build-arg LIBTORRENT_RELEASE=$LIBTORRENT_VER \
 	--build-arg RELEASE=$RELEASE_VER \
 	.')
 	}
@@ -73,7 +73,7 @@ steps {
 	sh ('echo $CREDS_DOCKERHUB_PSW | docker login -u $CREDS_DOCKERHUB_USR --password-stdin')
 	sh ('docker image push $CONTAINER_REPOSITORY:latest')
 	sh ('docker image push $CONTAINER_REPOSITORY:$BUILD_NUMBER')
-	sh ('docker image push $CONTAINER_REPOSITORY:${RELEASE_VER}_${LIBTORRENT_RELEASE_VER}')
+	sh ('docker image push $CONTAINER_REPOSITORY:${RELEASE_TAG}_${LIBTORRENT_VER}')
 	}
 	}
 
@@ -95,9 +95,9 @@ post {
 success {
 sshagent (credentials: ['bd8b00ff-decf-4a75-9e56-1ea2c7d0d708']) {
     sh('git tag -f $BUILD_NUMBER')
-    sh('git tag -f ${RELEASE_VER}_${LIBTORRENT_RELEASE_VER}')
+    sh('git tag -f ${RELEASE_TAG}_${LIBTORRENT_VER}')
     sh('git push -f git@github.com:$GITHUB_REPOSITORY.git $BUILD_NUMBER')
-    sh('git push -f git@github.com:$GITHUB_REPOSITORY.git ${RELEASE_VER}_${LIBTORRENT_RELEASE_VER}')
+    sh('git push -f git@github.com:$GITHUB_REPOSITORY.git ${RELEASE_TAG}_${LIBTORRENT_VER}')
 	}
 	}
 	}
