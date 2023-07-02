@@ -27,7 +27,7 @@ script{
 	| jq -r ".[].name" | grep -v -e "alpha" -e "beta" -e "rc" | head -n 1', returnStdout: true).trim()
 	env.LIBTORRENT_VER = sh(script: 'curl -u "${SECRETUSER}:${SECRETPASS}" -sX GET "https://api.github.com/repos/${LIBTORRENT_RELEASE_URL_SUFFIX}" \
 	| jq -r ".tag_name" | sed "s/v//"', returnStdout: true).trim() 
-	env.RELEASE_TAG = sh(script: 'echo $RELEASE_VER | sed -e 's/release-//g'", returnStdout: true).trim()
+	env.RELEASE_TAG = sh(script: 'echo $RELEASE_VER | sed -e "s/release-//g"', returnStdout: true).trim()
 	}
 	}
 	}
