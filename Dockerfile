@@ -1,4 +1,4 @@
-ARG ALPINE_VER="3.18"
+ARG ALPINE_VER="3.19"
 FROM alpine:${ALPINE_VER} as base
 
 # cmake options
